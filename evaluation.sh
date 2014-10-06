@@ -144,22 +144,36 @@ function prepare_jar_file() {
     find $SRC -name *.java | xargs javac -d $TARGET -classpath $CLASSPATH_BASE:$SRC
 }
 
-# run the tests
-function run_tests() {
-    echo 
-    echo RUNNING ProjectTest
-    java -cp $TARGET:$CLASSPATH_BASE org.junit.runner.JUnitCore "$PACKAGE.test.ProjectTest"
-    echo "Points for test (max $DEFAULT_TEST_POINTS):"
-    read test_points
-    [[ "x$test_points" = "x" ]] && test_points=$DEFAULT_TEST_POINTS
+# takes input, points for given category, and stores in given variable
+function points_notes() {
+    msg=$1
+    points_var=$2
+    default_points=$3
     
+    echo "$msg (Leave empty for default (${default_points}))":
+    read $points_var
+    eval assigned_points=\$$points_var
+
+    [[ "x$assigned_points" = "x" ]] && eval $points_var=$default_points
+    eval assigned_points=\$$points_var    
+
     if $SHOW_NOTES ; then
-        if ! $NOTES_ONLY_FOR_BAD || [[ $test_points != $DEFAULT_TEST_POINTS ]] ; then
+        if ! $NOTES_ONLY_FOR_BAD || [[ $assigned_points != $default_points ]] ; then
             echo "Notes:"
             read notes
             [[ "x$notes" != "x" ]] && final_notes="$final_notes \n$notes"
         fi
     fi
+    
+}
+
+# run the tests
+function run_tests() {
+    echo 
+    echo RUNNING ProjectTest
+    java -cp $TARGET:$CLASSPATH_BASE org.junit.runner.JUnitCore "$PACKAGE.test.ProjectTest"
+    
+    points_notes "Points for test" test_points $DEFAULT_TEST_POINTS
 }
 
 # run the extras
@@ -169,17 +183,8 @@ function run_extras() {
     [[ -f $TARGET/$PACKAGE_DIR/demo/Demo.class ]] && java -cp $TARGET "$PACKAGE.demo.Demo"
     [[ -f $TARGET/$PACKAGE_DIR/demo/Draw.class ]] && java -cp $TARGET "$PACKAGE.demo.Draw"
     [[ -f $TARGET/$PACKAGE_DIR/demo/DrawExtra$ITERATION.class ]] && java -cp $TARGET "$PACKAGE.demo.DrawExtra$ITERATION"
-    echo "Points for extras (max $DEFAULT_EXTRA_POINTS):"
-    read extra_points
-    [[ "x$extra_points" = "x" ]] && extra_points=$DEFAULT_EXTRA_POINTS
-
-    if $SHOW_NOTES ; then
-        if  ! $NOTES_ONLY_FOR_BAD || [[ $extra_points != $DEFAULT_EXTRA_POINTS ]] ; then
-            echo "Notes:"
-            read notes
-            [[ "x$notes" != "x" ]] && final_notes="$final_notes \n$notes"
-        fi
-    fi
+    
+    points_notes "Points for extras" extra_points $DEFAULT_EXTRA_POINTS
 }
 
 # open source files in editor one by one
@@ -189,17 +194,8 @@ function show_sources() {
     for pattern in $(relevant_files $ITERATION) ; do
         $EDITOR $(find $SRC -name "${pattern}*")
     done
-    echo "Penalisation for sources (negative):"
-    read sources_penalisation
-    [[ "x$sources_penalisation" = "x" ]] && sources_penalisation=$DEFAULT_SOURCE_PENALISATION
-
-    if $SHOW_NOTES ; then
-        if ! $NOTES_ONLY_FOR_BAD || [[ $sources_penalisation != $DEFAULT_SOURCE_PENALISATION ]] ; then
-            echo "Notes:"
-            read notes
-            [[ "x$notes" != "x" ]] && final_notes="$final_notes \n$notes"
-        fi
-    fi
+    
+    points_notes "Penalisation for sources (negative)" sources_penalisation $DEFAULT_SOURCE_PENALISATION
 }
 
 
