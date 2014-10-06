@@ -15,7 +15,7 @@
 # USER OPTIONS
 #
 # base dir, other dirs are defined relative to it
-export BASE_DIR="/home/rsmeral/Dropbox/pb162"
+export BASE_DIR="/configure/this/dir"
 
 # a directory containing folders named 01, 02, ..., 09; each containing JAR files with student solutions
 export ITERATIONS_DIR=$BASE_DIR/iterations
