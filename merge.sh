@@ -10,10 +10,11 @@ export RESULTS_DIR=$ITERATION_DIR/results
 export PROJECT_NOTEBOOK_TXT_NAME="PB162_Projekt_-_iterace_${ITERATION}.txt";
 export TEST_NOTEBOOK_TXT_NAME="PB162_Ostry_test_${ITERATION}.txt"
 
+total_student_count=$(sed '/^\s*$/d' $ITERATION_DIR/$PROJECT_NOTEBOOK_TXT_NAME  | wc -l  | sed "s%\([0-9]\{1,3\}\)\s.*%\1%")
+evaluated_count=0
 # parse all result files
 for result_file in $(ls ${RESULTS_DIR}) ; do
     uco=${result_file##*_}
-    echo $uco
     
     #
     # PARSE INPUT
@@ -27,16 +28,17 @@ for result_file in $(ls ${RESULTS_DIR}) ; do
         quick_test_points=$(grep "${uco}" $ITERATION_DIR/$TEST_NOTEBOOK_TXT_NAME | tr -d $'\r' | sed "s%${uco}.*\*\(.*\)%\1%")
         project_points=$(echo "$project_points + $quick_test_points" | bc)
     fi
-    
-    echo $student_result
-    echo $project_points
-    echo $project_note
 
     #
     # WRITE OUT
     #
     sed -i "s%\(${uco}.*${uco}/.*/.*\):.*%\1:*$project_points $project_note%" $ITERATION_DIR/$PROJECT_NOTEBOOK_TXT_NAME
+    (( evaluated_count++ ))
 done
 
+echo "Evaluated $evaluated_count students out of $total_student_count total"
+remaining_count=$(echo "$total_student_count - $evaluated_count" | bc)
+
+[[ $remaining_count != "0" ]] && echo "Filling in *0 for remaining $remaining_count students"
 # still need to deal with those who did not turn in their solution - fill zeros
 sed -i "s%^\([0-9]\{6\}.*[0-9]\{6\}/.*/.*\):$%\1:*0%g" $ITERATION_DIR/$PROJECT_NOTEBOOK_TXT_NAME
