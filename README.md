@@ -13,16 +13,17 @@ PB162 automated evaluation script
 
 ## What?
 
-The scipt automatically executes the three evaluation phases 
+The script automatically executes the three evaluation phases 
  * run unit tests
  * run extras
  * show sources
 
 After each phase, user enters the number of points (and optional notes), otherwise the default value is used.
-The results are placed in text files named "Surname_Firstname_UCO" in a specified folder.
+The results are placed in text files named `Surname_Firstname_UCO` in a specified folder.
 
-The script expects the JAR files to be named with the standard IS scheme: "UCO_Surname_Firstname.*\.jar".
-The script does not expect you to judge its aesthetics (fyi, it works mostly with global state, yuck).
+The script _does expect_ the JAR files to be named with the standard IS scheme: `UCO_Surname_Firstname.*\.jar`.
+
+The script _does not expect_ you to judge its aesthetics (fyi, it works mostly with global state, yuck).
 
 There's also a script call `merge.sh` which will transform the output to the txt format for import into notebooks. It can also subtract points from the Quick test (_Ostry test_).
 
@@ -57,13 +58,17 @@ won't, the script will ask.
 ## Merging
 
 The script `merge.sh` transforms the results into the txt format for import into notebooks. It needs the same parameter as evaluation script - the iteration number (e.g. `01`). 
-It expects that there's a TXT file exported from IS in the iteration dir and will fill the last column. It also looks for the Quick test (_Ostry test_) file.
+It expects text files in the results directory, and the notebook-exported project iteration text file and the quick test (_Ostry test_) file in the iteration dir.
 
     $BASE_DIR/
         iterations/
             01/ 
+                results/
+                    Surname1_Firstname1_UCO1
+                    Surname2_Firstname2_UCO2
+                    ...
                 PB162_Projekt_-_iterace_01.txt
                 PB162_Ostry_test_01.txt
 
 ---
-_Disclaimer: this script is not foolproof and *might* cause your computer to spontaneously combust if improperly used. Do not put in a microwave oven. Do not tumble dry._
+_Disclaimer: these scripts are not foolproof and *might* cause your computer to spontaneously combust if improperly used. Do not put in a microwave oven. Do not tumble dry._
