@@ -2,15 +2,16 @@
 # PB162 automated evaluation script
 # 
 # - automatically executes the three evaluation phases 
-#  - tests
-#  - extras
-#  - sources
+#  - run unit tests
+#  - run extras
+#  - show sources
 # 
-# - after each phase, user enters the number of points, otherwise the default is used
+# - after each phase, user enters the number of points (and optional notes), otherwise the default value is used
 # - the results are placed in text files named "Surname_Firstname_UCO" in a specified folder
-#
-# - the program expects the JAR files to be named with the standard IS scheme: "UCO_Surname_Firstname.*\.jar"
-#
+# - files matching is_export*.zip are automatically exploded
+# - the script expects the JAR files to be named with the standard IS scheme: "UCO_Surname_Firstname.*\.jar"
+# - the script does not expect you to judge its aesthetics (fyi, it works mostly with global state, yuck)
+
 #
 # USER OPTIONS
 #
@@ -31,6 +32,9 @@ export SHOW_NOTES=true
 
 # only valid if SHOW_NOTES=true; shows notes only if the points for the phase are not the default value (= if there is a problem)
 export NOTES_ONLY_FOR_BAD=true
+
+# location of junit jar
+export JUNIT_LIB="/usr/share/java/junit.jar"
 
 # java override
 export JAVA_HOME=/usr/lib/jvm/java-1.7.0
@@ -68,13 +72,37 @@ export ITERATION=${1:-$(echo "Iteration:" 1>&2; read ITERATION; echo -n $ITERATI
 export ITERATION_DIR=$ITERATIONS_DIR/$ITERATION
 export RESULTS_DIR=$ITERATION_DIR/results
 export LESSON=lesson$ITERATION
-export CLASSPATH_BASE=$BASE_DIR/resources/junit/junit-4.10.jar
+export CLASSPATH_BASE=$JUNIT_LIB
 
-[[ ! -d $RESULTS_DIR ]] && mkdir $RESULTS_DIR
+# looks for files named is_export*.zip in $ITERATION_DIR, unzips them and possibly overwrites old jar/done files, if the unzipped is newer
+function explode_is_export_zips {
+    IS_EXPORT_DIR=$ITERATION_DIR/is-export-tmp
+    rm -rf $IS_EXPORT_DIR
+    mkdir $IS_EXPORT_DIR
 
-for jarfile in $(find $ITERATION_DIR -name *.jar) ; do
+    for is_export_zip in $(find $ITERATION_DIR -name "is_export*.zip") ; do
+        local new_files=0
+        unzip -q $is_export_zip -d $IS_EXPORT_DIR "*.jar"
+        for unzipped_jar in $(find $IS_EXPORT_DIR -name "*.jar") ; do
+            existing_file=$(find $ITERATION_DIR -maxdepth 1 -name "$(basename ${unzipped_jar})*")
+            
+            # if the iteration contains a file (jar or done) that is also in the zip, use the one from zip only if it's newer
+            if [[  "x$existing_file" = "x" || ( -f $ITERATION_DIR/$existing_file && $unzipped_jar -nt $ITERATION_DIR/$existing_file ) ]] ; then
+                [[ "x$existing_file" != "x" && -f $ITERATION_DIR/$existing_file ]] && rm $existing_file
+                mv $unzipped_jar $ITERATION_DIR/
+                ((new_files++))
+            fi
+        done
+        rm $is_export_zip
+        [[ $new_files != "0" ]] && echo "Extracted $new_files new files from $(basename $is_export_zip)"
+    done
     
-    unset notes final_notes extra_points test_points negative_points
+    rm -rf $IS_EXPORT_DIR
+}
+
+# set up dirs and vars, show info
+function initiate_jar_file() {
+    unset notes final_notes extra_points test_points sources_penalisation
     
     echo "========================"
 
@@ -90,8 +118,12 @@ for jarfile in $(find $ITERATION_DIR -name *.jar) ; do
     uco_name=$(basename $jarfile | sed "s%\([0-9]*\)-\([A-Za-z_]*\).*%\2_\1%")
     echo $uco_name
     echo
+}
 
-    # unpack the sources from the jar
+# unpacking, moving, replacing, copying authoritative files, compilation
+function prepare_jar_file() {
+
+     # unpack the sources from the jar
     unzip -q $jarfile -d $SRC *.java
     
     # remove test and draw files from student's archive and replace with authoritative ones
@@ -110,8 +142,10 @@ for jarfile in $(find $ITERATION_DIR -name *.jar) ; do
     echo
     echo COMPILING
     find $SRC -name *.java | xargs javac -d $TARGET -classpath $CLASSPATH_BASE:$SRC
+}
 
-    # run the tests - max 3 points
+# run the tests
+function run_tests() {
     echo 
     echo RUNNING ProjectTest
     java -cp $TARGET:$CLASSPATH_BASE org.junit.runner.JUnitCore "$PACKAGE.test.ProjectTest"
@@ -126,8 +160,10 @@ for jarfile in $(find $ITERATION_DIR -name *.jar) ; do
             [[ "x$notes" != "x" ]] && final_notes="$final_notes \n$notes"
         fi
     fi
+}
 
-    # run the extras - max 2 points
+# run the extras
+function run_extras() {
     echo
     echo RUNNING EXTRAS
     [[ -f $TARGET/$PACKAGE_DIR/demo/Demo.class ]] && java -cp $TARGET "$PACKAGE.demo.Demo"
@@ -144,26 +180,47 @@ for jarfile in $(find $ITERATION_DIR -name *.jar) ; do
             [[ "x$notes" != "x" ]] && final_notes="$final_notes \n$notes"
         fi
     fi
+}
 
-    # open source files in editor one by one
+# open source files in editor one by one
+function show_sources() {
     echo
     echo SHOWING SOURCES
     for pattern in $(relevant_files $ITERATION) ; do
         $EDITOR $(find $SRC -name "${pattern}*")
     done
     echo "Penalisation for sources (negative):"
-    read negative_points
-    [[ "x$negative_points" = "x" ]] && negative_points=$DEFAULT_SOURCE_PENALISATION
+    read sources_penalisation
+    [[ "x$sources_penalisation" = "x" ]] && sources_penalisation=$DEFAULT_SOURCE_PENALISATION
 
     if $SHOW_NOTES ; then
-        if ! $NOTES_ONLY_FOR_BAD || [[ $negative_points != $DEFAULT_SOURCE_PENALISATION ]] ; then
+        if ! $NOTES_ONLY_FOR_BAD || [[ $sources_penalisation != $DEFAULT_SOURCE_PENALISATION ]] ; then
             echo "Notes:"
             read notes
             [[ "x$notes" != "x" ]] && final_notes="$final_notes \n$notes"
         fi
     fi
+}
+
+
+# the full cycle for one student jar file
+function process_jar_file() {
+
+    initiate_jar_file
     
-    total=$(echo "$test_points + $extra_points + $negative_points" | bc)
+    prepare_jar_file
+
+    run_tests
+
+    run_extras
+
+    show_sources
+
+}
+
+# sum points, concatenate notes, output, ask if done
+function summarize_output() {
+    total=$(echo "$test_points + $extra_points + $sources_penalisation" | bc)
     echo 
     echo "Total points: $total"
     echo "*${total}" > $RESULTS_DIR/$uco_name
@@ -173,14 +230,40 @@ for jarfile in $(find $ITERATION_DIR -name *.jar) ; do
         echo -e $final_notes >> $RESULTS_DIR/$uco_name
     fi
 
+    # trim empty lines
+    sed -i '/^\s*$/d' $RESULTS_DIR/$uco_name
+
     echo 
     echo "MARK AS DONE? (Enter or 'n')"
     read mark_done
     if [[ $mark_done != "n" ]] ; then
         mv $jarfile $jarfile.done
     fi
+}
 
-    echo
-    echo "CONTINUE TO NEXT FILE? (Enter or Ctrl-C)"
-    read
-done
+# start the process for jar files found in $ITERATION_DIR
+function start_evaluation() {
+
+    [[ ! -d $RESULTS_DIR ]] && mkdir $RESULTS_DIR
+
+    for jarfile in $(find $ITERATION_DIR -name *.jar) ; do
+        
+        process_jar_file
+        
+        summarize_output
+
+        echo
+        echo "CONTINUE TO NEXT FILE? (Enter or Ctrl-C)"
+        read
+    done
+}
+
+function main() {
+    
+    explode_is_export_zips
+
+    start_evaluation   
+    
+}
+
+main
