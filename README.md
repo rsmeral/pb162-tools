@@ -4,6 +4,7 @@ PB162 automated evaluation script
 ## Quick usage
 
  * Configure `BASE_DIR` in both scripts
+ * put the reference project at `$BASE_DIR/project-complete/pb162-2014`
  * put `is_export.zip`s into `$BASE_DIR/iterations/0X`
  * put `PB162_Projekt_-_iterace_0X.txt` (colon-separated ascii) into `$BASE_DIR/iterations/0X`
  * put `PB162_Ostry_test_0X.txt` (colon-separated ascii) into `$BASE_DIR/iterations/0X`
