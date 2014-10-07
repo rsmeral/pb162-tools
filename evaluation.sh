@@ -33,7 +33,10 @@ export SHOW_NOTES=true
 # only valid if SHOW_NOTES=true; shows notes only if the points for the phase are not the default value (= if there is a problem)
 export NOTES_ONLY_FOR_BAD=true
 
-# location of junit jar
+# automatically assigns DEFAULT_TEST_POINTS if the tests pass, without asking
+export AUTO_EVALUATE_PASSING_PHASE=true
+
+# location of junit jar (might have a dependency on hamcrest-core)
 export JUNIT_LIB="/usr/share/java/junit.jar"
 
 # java override
@@ -149,19 +152,26 @@ function points_notes() {
     msg=$1
     points_var=$2
     default_points=$3
+    auto_default=${4:-"false"}
     
     echo "$msg (Leave empty for default (${default_points}))":
-    read $points_var
-    eval assigned_points=\$$points_var
+    if $auto_default ; then
+        eval $points_var=$default_points
+        echo "${default_points} (auto)"
+    else
+            
+        read $points_var
+        eval assigned_points=\$$points_var
 
-    [[ "x$assigned_points" = "x" ]] && eval $points_var=$default_points
-    eval assigned_points=\$$points_var    
+        [[ "x$assigned_points" = "x" ]] && eval $points_var=$default_points
+        eval assigned_points=\$$points_var    
 
-    if $SHOW_NOTES ; then
-        if ! $NOTES_ONLY_FOR_BAD || [[ $assigned_points != $default_points ]] ; then
-            echo "Notes:"
-            read notes
-            [[ "x$notes" != "x" ]] && final_notes="$final_notes \n$notes"
+        if $SHOW_NOTES ; then
+            if ! $NOTES_ONLY_FOR_BAD || [[ $assigned_points != $default_points ]] ; then
+                echo "Notes:"
+                read notes
+                [[ "x$notes" != "x" ]] && final_notes="$final_notes \n$notes"
+            fi
         fi
     fi
     
@@ -171,9 +181,12 @@ function points_notes() {
 function run_tests() {
     echo 
     echo RUNNING ProjectTest
-    java -cp $TARGET:$CLASSPATH_BASE org.junit.runner.JUnitCore "$PACKAGE.test.ProjectTest"
-    
-    points_notes "Points for test" test_points $DEFAULT_TEST_POINTS
+    if java -cp $TARGET:$CLASSPATH_BASE org.junit.runner.JUnitCore "$PACKAGE.test.ProjectTest" && $AUTO_EVALUATE_PASSING_PHASE ; then
+        auto_eval_test="true"
+    else 
+        auto_eval_test="false"
+    fi
+    points_notes "Points for test" test_points $DEFAULT_TEST_POINTS $auto_eval_test
 }
 
 # run the extras
