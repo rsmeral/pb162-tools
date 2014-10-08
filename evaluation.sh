@@ -24,7 +24,7 @@ export ITERATIONS_DIR=$BASE_DIR/iterations
 # path to the reference solution project
 export REFERENCE_PROJECT_DIR=$BASE_DIR/project-complete/pb162-2014
 
-# the program to use for showing sources
+# the program to use for showing sources; best suited for a graphical editor, otherwise the other options might need to be tweaked
 export EDITOR=kwrite
 
 # after each part of a student's solution (tests, extras, source), it's possible to enter notes for the student's notebooks
@@ -35,6 +35,12 @@ export NOTES_ONLY_FOR_BAD=true
 
 # automatically assigns DEFAULT_TEST_POINTS if the tests pass, without asking
 export AUTO_EVALUATE_PASSING_PHASE=true
+
+# opens all sources at once, passing them all as arguments to the $EDITOR, otherwise $EDITOR is executed separately for each source
+export SHOW_SOURCES_ALL_AT_ONCE=true
+
+# defines order in which notes and points are input; can be configured individually for each phase in process_jar_file
+export POINTS_THEN_NOTES=true
 
 # location of junit jar (might have a dependency on hamcrest-core)
 export JUNIT_LIB="/usr/share/java/junit.jar"
@@ -147,31 +153,40 @@ function prepare_jar_file() {
     find $SRC -name *.java | xargs javac -d $TARGET -classpath $CLASSPATH_BASE:$SRC
 }
 
+function input_notes() {
+    if $SHOW_NOTES ; then
+        echo "Notes:"
+        read notes
+        [[ "x$notes" != "x" ]] && final_notes="$final_notes \n$notes"
+    fi
+}
+
 # takes input, points for given category, and stores in given variable
 function points_notes() {
     msg=$1
     points_var=$2
     default_points=$3
     auto_default=${4:-"false"}
-    
+
+    if ! $POINTS_THEN_NOTES ; then
+        input_notes
+    fi
+
     echo "$msg (Leave empty for default (${default_points}))":
     if $auto_default ; then
         eval $points_var=$default_points
         echo "${default_points} (auto)"
-    else
-            
+    else    
         read $points_var
         eval assigned_points=\$$points_var
 
         [[ "x$assigned_points" = "x" ]] && eval $points_var=$default_points
-        eval assigned_points=\$$points_var    
-
-        if $SHOW_NOTES ; then
-            if ! $NOTES_ONLY_FOR_BAD || [[ $assigned_points != $default_points ]] ; then
-                echo "Notes:"
-                read notes
-                [[ "x$notes" != "x" ]] && final_notes="$final_notes \n$notes"
-            fi
+        eval assigned_points=\$$points_var
+    fi
+    
+    if $POINTS_THEN_NOTES ; then
+        if ! $NOTES_ONLY_FOR_BAD || [[ $assigned_points != $default_points ]] ; then
+            input_notes
         fi
     fi
     
@@ -200,13 +215,21 @@ function run_extras() {
     points_notes "Points for extras" extra_points $DEFAULT_EXTRA_POINTS
 }
 
-# open source files in editor one by one
+# open source files in editor one by one, or at once
 function show_sources() {
     echo
     echo SHOWING SOURCES
     for pattern in $(relevant_files $ITERATION) ; do
-        $EDITOR $(find $SRC -name "${pattern}*")
+        matching_source=$(find $SRC -name "${pattern}*")
+        if $SHOW_SOURCES_ALL_AT_ONCE ; then
+            filenames="$filenames $matching_source"
+        else
+            $EDITOR $matching_source
+        fi
     done
+    if $SHOW_SOURCES_ALL_AT_ONCE ; then
+        $EDITOR $filenames &
+    fi
     
     points_notes "Penalisation for sources (negative)" sources_penalisation $DEFAULT_SOURCE_PENALISATION
 }
@@ -223,16 +246,22 @@ function process_jar_file() {
 
     run_extras
 
-    show_sources
+    POINTS_THEN_NOTES=false show_sources
 
 }
 
 # sum points, concatenate notes, output, ask if done
 function summarize_output() {
     total=$(echo "${test_points:-"0"} + ${extra_points:-"0"} + ${sources_penalisation:-"0"}" | bc)
+    if [[ $(echo "$total < 0" | bc) -eq 1 ]]; then
+        final_points="0"
+    else
+        final_points=$total
+    fi
+    
     echo 
-    echo "Total points: $total"
-    echo "*${total}" > $RESULTS_DIR/$uco_name
+    echo "Total points: $final_points"
+    echo "*${final_points}" > $RESULTS_DIR/$uco_name
 
     if $SHOW_NOTES ; then
         echo -e $final_notes

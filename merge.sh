@@ -27,12 +27,17 @@ for result_file in $(ls ${RESULTS_DIR}) ; do
     if [[ -f $ITERATION_DIR/$TEST_NOTEBOOK_TXT_NAME ]] ; then
         quick_test_points=$(grep "${uco}" $ITERATION_DIR/$TEST_NOTEBOOK_TXT_NAME | tr -d $'\r' | sed "s%${uco}.*\*\(.*\)%\1%")
         project_points=$(echo "$project_points + $quick_test_points" | bc)
+        if [[ $(echo "$project_points < 0" | bc) -eq 1 ]]; then
+            final_points="0"
+        else
+            final_points=$project_points
+        fi
     fi
 
     #
     # WRITE OUT
     #
-    sed -i "s%\(${uco}.*${uco}/.*/.*\):.*%\1:*$project_points $project_note%" $ITERATION_DIR/$PROJECT_NOTEBOOK_TXT_NAME
+    sed -i "s%\(${uco}.*${uco}/.*/.*\):.*%\1:*$final_points $project_note%" $ITERATION_DIR/$PROJECT_NOTEBOOK_TXT_NAME
     (( evaluated_count++ ))
 done
 
