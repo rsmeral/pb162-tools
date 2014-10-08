@@ -229,7 +229,7 @@ function process_jar_file() {
 
 # sum points, concatenate notes, output, ask if done
 function summarize_output() {
-    total=$(echo "$test_points + $extra_points + $sources_penalisation" | bc)
+    total=$(echo "${test_points:-"0"} + ${extra_points:-"0"} + ${sources_penalisation:-"0"}" | bc)
     echo 
     echo "Total points: $total"
     echo "*${total}" > $RESULTS_DIR/$uco_name
