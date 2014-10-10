@@ -42,6 +42,12 @@ export SHOW_SOURCES_ALL_AT_ONCE=true
 # defines order in which notes and points are input; can be configured individually for each phase in process_jar_file
 export POINTS_THEN_NOTES=true
 
+# by default, files are presented in random order, to prevent effects of fatigue
+export SORT_FUNCTION=shuf
+
+# indicates, whether names and UCOs should be shown in the evaluation process
+export ANONYMIZE=false
+
 # location of junit jar (might have a dependency on hamcrest-core)
 export JUNIT_LIB="/usr/share/java/junit.jar"
 
@@ -125,7 +131,11 @@ function initiate_jar_file() {
     
     # remember relevant part of file name
     uco_name=$(basename $jarfile | sed "s%\([0-9]*\)-\([A-Za-z_]*\).*%\2_\1%")
-    echo $uco_name
+    if $ANONYMIZE ; then
+        echo "Anonymous student"
+    else
+        echo $uco_name
+    fi
     echo
 }
 
@@ -147,10 +157,17 @@ function prepare_jar_file() {
         cat $javafile | sed "s%package *$LESSON%package $PACKAGE%" | sed "s%import *$LESSON%import $PACKAGE%" > $SRC/$PACKAGE_DIR/demo/$(basename $javafile)
     done
     
+    # optionally anonymize
+    sources=$(find $SRC -name *.java)
+    if $ANONYMIZE ; then
+        for source in $sources ; do
+            sed -i "s%@author.*%@author Anonymous student%" $source
+        done
+    fi
     # compile the sources
     echo
     echo COMPILING
-    find $SRC -name *.java | xargs javac -d $TARGET -classpath $CLASSPATH_BASE:$SRC
+    echo $sources | xargs javac -d $TARGET -classpath $CLASSPATH_BASE:$SRC
 }
 
 function input_notes() {
@@ -286,7 +303,7 @@ function start_evaluation() {
 
     [[ ! -d $RESULTS_DIR ]] && mkdir $RESULTS_DIR
 
-    for jarfile in $(find $ITERATION_DIR -name *.jar) ; do
+    for jarfile in $(find $ITERATION_DIR -name *.jar | $SORT_FUNCTION) ; do
         
         process_jar_file
         
