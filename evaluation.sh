@@ -77,7 +77,7 @@ function relevant_files() {
 #
 export WORK_DIR=$BASE_DIR/work
 export PACKAGE_DIR=$(echo $PACKAGE | sed "s%\.%/%g")
-export ITERATION=${1:-$(echo "Iteration:" 1>&2; read ITERATION; echo -n $ITERATION)}
+export ITERATION=${1:-$(echo "Iteration:" 1>&2; read -e ITERATION; echo -n $ITERATION)}
 export ITERATION_DIR=$ITERATIONS_DIR/$ITERATION
 export RESULTS_DIR=$ITERATION_DIR/results
 export LESSON=lesson$ITERATION
@@ -156,7 +156,7 @@ function prepare_jar_file() {
 function input_notes() {
     if $SHOW_NOTES ; then
         echo "Notes:"
-        read notes
+        read -e notes
         [[ "x$notes" != "x" ]] && final_notes="$final_notes \n$notes"
     fi
 }
@@ -176,8 +176,9 @@ function points_notes() {
     if $auto_default ; then
         eval $points_var=$default_points
         echo "${default_points} (auto)"
+        eval assigned_points=\$$points_var
     else    
-        read $points_var
+        read -e $points_var
         eval assigned_points=\$$points_var
 
         [[ "x$assigned_points" = "x" ]] && eval $points_var=$default_points
@@ -217,6 +218,7 @@ function run_extras() {
 
 # open source files in editor one by one, or at once
 function show_sources() {
+    unset filenames
     echo
     echo SHOWING SOURCES
     for pattern in $(relevant_files $ITERATION) ; do
@@ -273,7 +275,7 @@ function summarize_output() {
 
     echo 
     echo "MARK AS DONE? (Enter or 'n')"
-    read mark_done
+    read -e mark_done
     if [[ $mark_done != "n" ]] ; then
         mv $jarfile $jarfile.done
     fi
