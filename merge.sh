@@ -25,7 +25,12 @@ for result_file in $(ls ${RESULTS_DIR}) ; do
     
     # if test notebook present, subtract test points
     if [[ -f $ITERATION_DIR/$TEST_NOTEBOOK_TXT_NAME ]] ; then
-        quick_test_points=$(grep "${uco}" $ITERATION_DIR/$TEST_NOTEBOOK_TXT_NAME | tr -d $'\r' | sed "s%${uco}.*\*\(.*\)%\1%")
+        quick_test_points_str=$(grep "${uco}" $ITERATION_DIR/$TEST_NOTEBOOK_TXT_NAME)
+        if [[ "x$quick_test_points_str" != "x" ]] ; then
+            quick_test_points=$(echo $quick_test_points_str | tr -d $'\r' | sed "s%${uco}.*\*\(.*\)%\1%")
+        else 
+            quick_test_points=0
+        fi
         project_points=$(echo "$project_points + $quick_test_points" | bc)
         if [[ $(echo "$project_points < 0" | bc) -eq 1 ]]; then
             final_points="0"
