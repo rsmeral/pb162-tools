@@ -289,6 +289,12 @@ function summarize_output() {
 
     # trim empty lines
     sed -i '/^\s*$/d' $RESULTS_DIR/$uco_name
+    
+    # replace colons (:) with dashes
+    if $(grep -q ":" $RESULTS_DIR/$uco_name) ; then
+        echo >&2 "WARNING: Replacing colons (:) with dashes ( - )"
+    fi
+    sed -i "s%:\s*% - %g" $RESULTS_DIR/$uco_name
 
     echo 
     echo "MARK AS DONE? (Enter or 'n')"
