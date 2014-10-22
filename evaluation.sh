@@ -87,6 +87,7 @@ export ITERATION=${1:-$(echo "Iteration:" 1>&2; read -e ITERATION; echo -n $ITER
 export ITERATION_DIR=$ITERATIONS_DIR/$ITERATION
 export RESULTS_DIR=$ITERATION_DIR/results
 export LESSON=lesson$ITERATION
+export ITERATION_NUM=$(echo $ITERATION | bc)
 export CLASSPATH_BASE=$JUNIT_LIB
 
 # looks for files named is_export*.zip in $ITERATION_DIR, unzips them and possibly overwrites old jar/done files, if the unzipped is newer
@@ -139,22 +140,38 @@ function initiate_jar_file() {
     echo
 }
 
+# filter package names
+function copy_src_filter_package() {
+    srcfile=$1
+    packageless=${srcfile##*lesson0?/}
+    cat $srcfile | sed "s%package *lesson0.%package $PACKAGE%" | sed "s%import *lesson0.%import $PACKAGE%" > $SRC/$PACKAGE_DIR/$packageless
+}
+
 # unpacking, moving, replacing, copying authoritative files, compilation
 function prepare_jar_file() {
 
      # unpack the sources from the jar
     unzip -q $jarfile -d $SRC *.java
     
-    # remove test and draw files from student's archive and replace with authoritative ones
+    # remove test and draw files from student's archive
     rm -rf $SRC/$PACKAGE_DIR/test
     rm -rf $SRC/$PACKAGE_DIR/demo/Draw*.java
 
     # copy authoritative test files and fix package and imports
     mkdir $SRC/$PACKAGE_DIR/test
-    cat $REFERENCE_PROJECT_DIR/test/$LESSON/test/ProjectTest.java | sed "s%package *$LESSON%package $PACKAGE%" | sed "s%import *$LESSON%import $PACKAGE%" > $SRC/$PACKAGE_DIR/test/ProjectTest.java
+    copy_src_filter_package $REFERENCE_PROJECT_DIR/test/$LESSON/test/ProjectTest.java
     cp -r $REFERENCE_PROJECT_DIR/test/cz $SRC/
-    for javafile in $(find $REFERENCE_PROJECT_DIR -path *$LESSON/demo* -name Draw*.java) ; do
-        cat $javafile | sed "s%package *$LESSON%package $PACKAGE%" | sed "s%import *$LESSON%import $PACKAGE%" > $SRC/$PACKAGE_DIR/demo/$(basename $javafile)
+
+    # copy authoritative demo files and fix package and imports
+    if [[ -f $REFERENCE_PROJECT_DIR/src/${LESSON}/demo/DrawExtra${ITERATION}.java ]] ; then
+        copy_src_filter_package $REFERENCE_PROJECT_DIR/src/${LESSON}/demo/DrawExtra${ITERATION}.java
+    fi
+
+    for i in $(seq 1 $ITERATION_NUM) ; do
+        lesson_i=lesson0${i}
+        for srcfile in $(find $REFERENCE_PROJECT_DIR -path "*$lesson_i/demo*" -name "Draw.java" | sort ) ; do
+            copy_src_filter_package $srcfile
+        done
     done
     
     # optionally anonymize
@@ -164,6 +181,7 @@ function prepare_jar_file() {
             sed -i "s%@author.*%@author Anonymous student%" $source
         done
     fi
+
     # compile the sources
     echo
     echo COMPILING
